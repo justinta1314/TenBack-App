@@ -9,9 +9,14 @@ import SwiftUI
 
 @main
 struct TenBackApp: App {
+    @State private var store = GameStore()
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            NavigationStack {
+                ContentView()
+            }
+            .environment(store)
         }
     }
 }

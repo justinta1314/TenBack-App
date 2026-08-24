@@ -19,21 +19,23 @@ struct AddGameView: View {
     private var activeFrameNumber: Int {
         editingFrameIndex.map { $0 + 1 } ?? (frames.count + 1)
     }
+    private var activeFrameIndex: Int {
+        editingFrameIndex ?? frames.count
+    }
+    private var currentRollNumber: Int {
+        currentFrameRolls.count + 1
+    }
     private var isTenthFrame: Bool { activeFrameNumber == 10 }
-
-    /// Completed frames plus an in-progress preview frame, for live scorecard display
-    private var displayFrames: [Frame] {
-        if currentFrameRolls.isEmpty {
-            return frames
-        }
-        return frames + [Frame(rolls: currentFrameRolls)]
+    private var gameIsComplete: Bool {
+        frames.count == 10
     }
 
     var body: some View {
         VStack(spacing: 20) {
             ScoreCardView(
-                frames: displayFrames,
-                cumulativeScores: Game(frames: displayFrames).cumulativeScores,
+                frames: frames,
+                cumulativeScores: Game(frames: frames).cumulativeScores,
+                activeFrameIndex: activeFrameIndex,
                 onEditFrame: startEditingFrame
             )
 
@@ -43,55 +45,66 @@ struct AddGameView: View {
                     .foregroundStyle(.orange)
             }
 
-            Text("Frame \(activeFrameNumber)")
-                .font(.title2.bold())
+            if !gameIsComplete || editingFrameIndex != nil {
+                RollIndicatorView(totalRolls: rollsInActiveFrame, currentRollIndex: currentFrameRolls.count)
 
-            PinDiagramView(knockedDownPins: $knockedDownPins)
+                PinDiagramView(knockedDownPins: $knockedDownPins)
 
-            Text("Pins this roll: \(knockedDownPins.count)")
-                .foregroundStyle(.secondary)
+                Text("Pins this roll: \(knockedDownPins.count)")
+                    .foregroundStyle(.secondary)
 
-            HStack(spacing: 12) {
-                Button("-") { recordRoll(pins: 0) }
+                HStack(spacing: 12) {
+                    Button("-") { recordRoll(pins: 0) }
+                        .buttonStyle(.bordered)
+                        .accessibilityLabel("Gutter")
+
+                    Button("X") { recordRoll(pins: 10) }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(!canStrike)
+                        .accessibilityLabel("Strike")
+
+                    Button("/") { recordSpare() }
+                        .buttonStyle(.bordered)
+                        .disabled(!canSpare)
+                        .accessibilityLabel("Spare")
+
+                    Button {
+                        undoLastRoll()
+                    } label: {
+                        Image(systemName: "arrow.uturn.backward")
+                    }
                     .buttonStyle(.bordered)
-                    .accessibilityLabel("Gutter")
-
-                Button("X") { recordRoll(pins: 10) }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!canStrike)
-                    .accessibilityLabel("Strike")
-
-                Button("/") { recordSpare() }
-                    .buttonStyle(.bordered)
-                    .disabled(!canSpare)
-                    .accessibilityLabel("Spare")
-
-                Button {
-                    undoLastRoll()
-                } label: {
-                    Image(systemName: "arrow.uturn.backward")
+                    .disabled(!canUndo)
+                    .accessibilityLabel("Undo last roll")
                 }
-                .buttonStyle(.bordered)
-                .disabled(!canUndo)
-                .accessibilityLabel("Undo last roll")
-            }
 
-            Button("Confirm Roll") {
-                recordRoll(pins: knockedDownPins.count)
+                Button("Confirm Roll") {
+                    recordRoll(pins: knockedDownPins.count)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(knockedDownPins.isEmpty)
+            } else {
+                Text("Game complete!")
+                    .font(.title2.bold())
+                    .foregroundStyle(.green)
+
+                Button("Submit Game") {
+                    saveGame()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(knockedDownPins.isEmpty)
 
             Spacer()
-
-            Text("Frames so far: \(frames.count)/10")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
         .padding()
         .navigationTitle("Add Game")
     }
 
+    
+    private var rollsInActiveFrame: Int {
+        isTenthFrame ? 3 : 2
+    }
     // MARK: - Editing
 
     private func startEditingFrame(_ index: Int) {
@@ -105,11 +118,9 @@ struct AddGameView: View {
 
     private func undoLastRoll() {
         if !currentFrameRolls.isEmpty {
-            // Remove the most recent roll in the frame currently being entered
             currentFrameRolls.removeLast()
             knockedDownPins.removeAll()
         } else if editingFrameIndex == nil && !frames.isEmpty {
-            // Nothing typed yet in the current frame — step back into the previous completed frame
             let lastFrame = frames.removeLast()
             currentFrameRolls = lastFrame.rolls
             currentFrameRolls.removeLast()
@@ -192,9 +203,7 @@ struct AddGameView: View {
             editingFrameIndex = nil
         } else {
             frames.append(newFrame)
-            if frames.count == 10 {
-                saveGame()
-            }
+            // no auto-save here anymore — waits for Submit Game button
         }
     }
 

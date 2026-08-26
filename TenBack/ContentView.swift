@@ -23,5 +23,8 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    NavigationStack {
+        ContentView()
+    }
+    .environment(GameStore())
 }

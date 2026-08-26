@@ -50,7 +50,7 @@ struct FrameBoxView: View {
                     Text(symbol).font(.caption.bold())
                 }
                 if symbols.isEmpty {
-                    Text(" ").font(.caption)  // keeps height consistent when empty
+                    Text(" ").font(.caption)
                 }
             }
             .frame(height: 16)
@@ -72,7 +72,7 @@ struct FrameBoxView: View {
 
 #Preview {
     ScoreCardView(
-        frames: [Frame(rolls: [10]), Frame(rolls: [7, 2])],
+        frames: [Frame(rollPins: [Set(1...10)]), Frame(rollPins: [[2, 4, 5, 6, 8], [1, 3, 7, 9, 10]])],
         cumulativeScores: [20, 29],
         activeFrameIndex: 2,
         onEditFrame: { _ in }

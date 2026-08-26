@@ -2,14 +2,14 @@
 //  RollIndicatorView.swift
 //  TenBack
 //
-//  Created by Justin Ta on 8/24/26.
+//  Created by Justin Ta on 8/22/26.
 //
 
 import SwiftUI
 
 struct RollIndicatorView: View {
-    let totalRolls: Int      // 2 for normal frames, up to 3 for the 10th frame
-    let currentRollIndex: Int // 0-based index of the roll being entered
+    let totalRolls: Int
+    let currentRollIndex: Int
 
     var body: some View {
         HStack(spacing: 6) {

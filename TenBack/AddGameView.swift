@@ -12,23 +12,21 @@ struct AddGameView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var frames: [Frame] = []
-    @State private var currentFrameRolls: [Int] = []
+    @State private var currentRollPins: [Set<Int>] = []
     @State private var knockedDownPins: Set<Int> = []
     @State private var editingFrameIndex: Int? = nil
 
-    private var activeFrameNumber: Int {
-        editingFrameIndex.map { $0 + 1 } ?? (frames.count + 1)
+    private var currentFrame: Frame {
+        Frame(rollPins: currentRollPins)
     }
+
     private var activeFrameIndex: Int {
         editingFrameIndex ?? frames.count
     }
-    private var currentRollNumber: Int {
-        currentFrameRolls.count + 1
-    }
+    private var activeFrameNumber: Int { activeFrameIndex + 1 }
     private var isTenthFrame: Bool { activeFrameNumber == 10 }
-    private var gameIsComplete: Bool {
-        frames.count == 10
-    }
+    private var rollsInActiveFrame: Int { isTenthFrame ? 3 : 2 }
+    private var gameIsComplete: Bool { frames.count == 10 }
 
     var body: some View {
         VStack(spacing: 20) {
@@ -46,24 +44,30 @@ struct AddGameView: View {
             }
 
             if !gameIsComplete || editingFrameIndex != nil {
-                RollIndicatorView(totalRolls: rollsInActiveFrame, currentRollIndex: currentFrameRolls.count)
+                RollIndicatorView(
+                    totalRolls: rollsInActiveFrame,
+                    currentRollIndex: currentRollPins.count
+                )
 
-                PinDiagramView(knockedDownPins: $knockedDownPins)
+                PinDiagramView(
+                    knockedDownPins: $knockedDownPins,
+                    standingPins: currentFrame.pinsStandingForNextRoll
+                )
 
                 Text("Pins this roll: \(knockedDownPins.count)")
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 12) {
-                    Button("-") { recordRoll(pins: 0) }
+                    Button("-") { recordRoll(pinsDown: []) }
                         .buttonStyle(.bordered)
                         .accessibilityLabel("Gutter")
 
-                    Button("X") { recordRoll(pins: 10) }
+                    Button("X") { recordRoll(pinsDown: currentFrame.pinsStandingForNextRoll) }
                         .buttonStyle(.borderedProminent)
                         .disabled(!canStrike)
                         .accessibilityLabel("Strike")
 
-                    Button("/") { recordSpare() }
+                    Button("/") { recordRoll(pinsDown: currentFrame.pinsStandingForNextRoll) }
                         .buttonStyle(.bordered)
                         .disabled(!canSpare)
                         .accessibilityLabel("Spare")
@@ -79,7 +83,7 @@ struct AddGameView: View {
                 }
 
                 Button("Confirm Roll") {
-                    recordRoll(pins: knockedDownPins.count)
+                    recordRoll(pinsDown: knockedDownPins)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(knockedDownPins.isEmpty)
@@ -101,75 +105,56 @@ struct AddGameView: View {
         .navigationTitle("Add Game")
     }
 
-    
-    private var rollsInActiveFrame: Int {
-        isTenthFrame ? 3 : 2
-    }
     // MARK: - Editing
 
     private func startEditingFrame(_ index: Int) {
         guard index < frames.count else { return }
         editingFrameIndex = index
-        currentFrameRolls = []
+        currentRollPins = []
         knockedDownPins = []
     }
 
     // MARK: - Undo
 
     private func undoLastRoll() {
-        if !currentFrameRolls.isEmpty {
-            currentFrameRolls.removeLast()
+        if !currentRollPins.isEmpty {
+            currentRollPins.removeLast()
             knockedDownPins.removeAll()
         } else if editingFrameIndex == nil && !frames.isEmpty {
             let lastFrame = frames.removeLast()
-            currentFrameRolls = lastFrame.rolls
-            currentFrameRolls.removeLast()
+            currentRollPins = lastFrame.rollPins
+            currentRollPins.removeLast()
             knockedDownPins.removeAll()
         }
     }
 
     private var canUndo: Bool {
-        !currentFrameRolls.isEmpty || (editingFrameIndex == nil && !frames.isEmpty)
+        !currentRollPins.isEmpty || (editingFrameIndex == nil && !frames.isEmpty)
     }
 
     // MARK: - Button enable logic
 
     private var canStrike: Bool {
         if isTenthFrame {
-            return pinsStandingForCurrentRoll() == 10
+            return currentFrame.pinsStandingForNextRoll.count == 10
         } else {
-            return currentFrameRolls.isEmpty
+            return currentRollPins.isEmpty
         }
     }
 
     private var canSpare: Bool {
-        guard let last = currentFrameRolls.last else { return false }
+        guard let last = currentRollPins.last else { return false }
         if isTenthFrame {
-            return last != 10 && pinsStandingForCurrentRoll() > 0
+            return last.count != 10 && !currentFrame.pinsStandingForNextRoll.isEmpty
         } else {
-            return currentFrameRolls.count == 1 && last != 10
-        }
-    }
-
-    private func pinsStandingForCurrentRoll() -> Int {
-        if currentFrameRolls.isEmpty { return 10 }
-
-        if isTenthFrame {
-            let last = currentFrameRolls.last ?? 0
-            let secondToLast = currentFrameRolls.count >= 2 ? currentFrameRolls[currentFrameRolls.count - 2] : nil
-
-            if last == 10 { return 10 }
-            if let prev = secondToLast, prev + last == 10 { return 10 }
-            return 10 - last
-        } else {
-            return 10 - (currentFrameRolls.first ?? 0)
+            return currentRollPins.count == 1 && last.count != 10
         }
     }
 
     // MARK: - Roll recording
 
-    private func recordRoll(pins: Int) {
-        currentFrameRolls.append(pins)
+    private func recordRoll(pinsDown: Set<Int>) {
+        currentRollPins.append(pinsDown)
         knockedDownPins.removeAll()
 
         if isTenthFrame {
@@ -177,33 +162,29 @@ struct AddGameView: View {
                 finishFrame()
             }
         } else {
-            if pins == 10 || currentFrameRolls.count == 2 {
+            if pinsDown.count == 10 || currentRollPins.count == 2 {
                 finishFrame()
             }
         }
     }
 
-    private func recordSpare() {
-        recordRoll(pins: pinsStandingForCurrentRoll())
-    }
-
     private func isTenthFrameComplete() -> Bool {
-        let rolls = currentFrameRolls
+        let rolls = currentRollPins.map { $0.count }
         if rolls.count == 2 && rolls[0] + rolls[1] < 10 { return true }
         if rolls.count == 3 { return true }
         return false
     }
 
     private func finishFrame() {
-        let newFrame = Frame(rolls: currentFrameRolls)
-        currentFrameRolls = []
+        let newFrame = Frame(rollPins: currentRollPins)
+        currentRollPins = []
 
         if let editIndex = editingFrameIndex {
             frames[editIndex] = newFrame
             editingFrameIndex = nil
         } else {
             frames.append(newFrame)
-            // no auto-save here anymore — waits for Submit Game button
+            // No auto-save — waits for the user to tap "Submit Game"
         }
     }
 

@@ -9,7 +9,6 @@ import SwiftUI
 
 struct AddGameView: View {
     @Environment(GameStore.self) private var store
-    @Environment(\.dismiss) private var dismiss
 
     @State private var frames: [Frame] = []
     @State private var currentRollPins: [Set<Int>] = []
@@ -25,7 +24,6 @@ struct AddGameView: View {
     }
     private var activeFrameNumber: Int { activeFrameIndex + 1 }
     private var isTenthFrame: Bool { activeFrameNumber == 10 }
-    private var rollsInActiveFrame: Int { isTenthFrame ? 3 : 2 }
     private var gameIsComplete: Bool { frames.count == 10 }
 
     var body: some View {
@@ -34,6 +32,7 @@ struct AddGameView: View {
                 frames: frames,
                 cumulativeScores: Game(frames: frames).cumulativeScores,
                 activeFrameIndex: activeFrameIndex,
+                activeRollIndex: currentRollPins.count,
                 onEditFrame: startEditingFrame
             )
 
@@ -44,11 +43,6 @@ struct AddGameView: View {
             }
 
             if !gameIsComplete || editingFrameIndex != nil {
-                RollIndicatorView(
-                    totalRolls: rollsInActiveFrame,
-                    currentRollIndex: currentRollPins.count
-                )
-
                 PinDiagramView(
                     knockedDownPins: $knockedDownPins,
                     standingPins: currentFrame.pinsStandingForNextRoll
@@ -191,7 +185,14 @@ struct AddGameView: View {
     private func saveGame() {
         let game = Game(date: Date(), frames: frames)
         store.addGame(game)
-        dismiss()
+        resetForm()
+    }
+
+    private func resetForm() {
+        frames = []
+        currentRollPins = []
+        knockedDownPins = []
+        editingFrameIndex = nil
     }
 }
 

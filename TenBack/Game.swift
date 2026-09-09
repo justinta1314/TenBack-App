@@ -24,16 +24,14 @@ struct Frame: Identifiable, Codable {
         rolls.count >= 2 && rolls[0] + rolls[1] == 10 && !isStrike
     }
 
+    /// Symbol per roll (handles strikes/spares generally, including 10th frame bonus rolls
+    /// like "9 / X" or "X X 5" — not just the simple first-two-rolls case).
     var displaySymbols: [String] {
-        guard !rolls.isEmpty else { return [] }
-
-        if isStrike {
-            return ["X"]
-        }
-
         var symbols: [String] = []
         for (index, roll) in rolls.enumerated() {
-            if isSpare && index == 1 {
+            if roll == 10 {
+                symbols.append("X")
+            } else if index > 0 && rolls[index - 1] != 10 && rolls[index - 1] + roll == 10 {
                 symbols.append("/")
             } else if roll == 0 {
                 symbols.append("-")
@@ -42,6 +40,22 @@ struct Frame: Identifiable, Codable {
             }
         }
         return symbols
+    }
+
+    /// Symbols padded/positioned into a fixed number of display slots (2 for a normal frame, 3 for the 10th).
+    /// A strike in a normal (2-slot) frame is conventionally shown in the right-hand box, left blank.
+    func slotSymbols(totalSlots: Int) -> [String?] {
+        var slots = [String?](repeating: nil, count: totalSlots)
+
+        if totalSlots == 2 && isStrike {
+            slots[1] = "X"
+            return slots
+        }
+
+        for (index, symbol) in displaySymbols.enumerated() where index < totalSlots {
+            slots[index] = symbol
+        }
+        return slots
     }
 }
 

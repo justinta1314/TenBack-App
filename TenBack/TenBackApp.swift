@@ -10,13 +10,13 @@ import SwiftUI
 @main
 struct TenBackApp: App {
     @State private var store = GameStore()
-    
+    @State private var arsenalStore = ArsenalStore()
+
     var body: some Scene {
         WindowGroup {
-            NavigationStack {
-                ContentView()
-            }
-            .environment(store)
+            RootTabView()
+                .environment(store)
+                .environment(arsenalStore)
         }
     }
 }

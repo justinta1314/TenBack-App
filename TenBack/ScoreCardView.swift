@@ -15,26 +15,38 @@ struct ScoreCardView: View {
     let onEditFrame: (Int) -> Void
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 4) {
-                ForEach(0..<10, id: \.self) { index in
-                    let totalSlots = index == 9 ? 3 : 2
-                    let frame = index < frames.count ? frames[index] : nil
-                    let isActiveFrame = index == activeFrameIndex
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(0..<10, id: \.self) { index in
+                        let totalSlots = index == 9 ? 3 : 2
+                        let frame = index < frames.count ? frames[index] : nil
+                        let hasStarted = (frame?.rollPins.isEmpty == false)
+                        let isActiveFrame = index == activeFrameIndex
 
-                    FrameBoxView(
-                        frameNumber: index + 1,
-                        totalSlots: totalSlots,
-                        slotSymbols: frame?.slotSymbols(totalSlots: totalSlots) ?? Array(repeating: nil, count: totalSlots),
-                        score: index < cumulativeScores.count ? "\(cumulativeScores[index])" : "",
-                        activeSlotIndex: isActiveFrame ? activeRollIndex : nil
-                    )
-                    .onTapGesture {
-                        onEditFrame(index)
+                        FrameBoxView(
+                            frameNumber: index + 1,
+                            totalSlots: totalSlots,
+                            slotSymbols: frame?.slotSymbols(totalSlots: totalSlots) ?? Array(repeating: nil, count: totalSlots),
+                            score: (hasStarted && index < cumulativeScores.count) ? "\(cumulativeScores[index])" : "",
+                            activeSlotIndex: isActiveFrame ? activeRollIndex : nil
+                        )
+                        .id(index)
+                        .onTapGesture {
+                            onEditFrame(index)
+                        }
                     }
                 }
+                .padding(.horizontal, 4)
             }
-            .padding(.horizontal, 4)
+            .onAppear {
+                proxy.scrollTo(activeFrameIndex, anchor: .center)
+            }
+            .onChange(of: activeFrameIndex) { _, newValue in
+                withAnimation {
+                    proxy.scrollTo(newValue, anchor: .center)
+                }
+            }
         }
     }
 }

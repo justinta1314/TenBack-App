@@ -26,15 +26,38 @@ struct AddGameView: View {
     private var isTenthFrame: Bool { activeFrameNumber == 10 }
     private var gameIsComplete: Bool { frames.count == 10 }
 
+    /// Frames for scorecard display: completed frames, with the frame currently
+    /// being entered (or edited) reflected live as rolls come in.
+    private var scoreCardFrames: [Frame] {
+        var result = frames
+        if let editIndex = editingFrameIndex {
+            result[editIndex] = Frame(rollPins: currentRollPins)
+        } else if result.count < 10 {
+            result.append(Frame(rollPins: currentRollPins))
+        }
+        return result
+    }
+
     var body: some View {
         VStack(spacing: 20) {
             ScoreCardView(
-                frames: frames,
-                cumulativeScores: Game(frames: frames).cumulativeScores,
+                frames: scoreCardFrames,
+                cumulativeScores: Game(frames: scoreCardFrames).cumulativeScores,
                 activeFrameIndex: activeFrameIndex,
                 activeRollIndex: currentRollPins.count,
                 onEditFrame: startEditingFrame
             )
+
+            if let maxScore = maxPossibleScore {
+                HStack {
+                    Text("Current: \(Game(frames: frames).totalScore)")
+                    Spacer()
+                    Text("Max Possible: \(maxScore)")
+                        .foregroundStyle(maxScore == 300 ? .green : .primary)
+                }
+                .font(.subheadline.bold())
+                .padding(.horizontal)
+            }
 
             if let editIndex = editingFrameIndex {
                 Text("Editing Frame \(editIndex + 1)")
@@ -167,6 +190,59 @@ struct AddGameView: View {
         if rolls.count == 2 && rolls[0] + rolls[1] < 10 { return true }
         if rolls.count == 3 { return true }
         return false
+    }
+
+    // MARK: - Max possible score
+
+    /// Highest score still achievable: actual rolls for completed frames,
+    /// best case (strikes / remaining pins) for everything not yet thrown.
+    /// Only meaningful during fresh entry (not while editing a past frame).
+    private var maxPossibleScore: Int? {
+        guard editingFrameIndex == nil else { return nil }
+
+        var hypotheticalFrames: [Frame] = frames // already-completed frames, as-is
+
+        // The frame currently being entered: fill remaining rolls with best case
+        if hypotheticalFrames.count < 10 {
+            hypotheticalFrames.append(bestCaseCompletion(of: currentRollPins, isTenth: hypotheticalFrames.count == 9))
+        }
+
+        // Frames not yet reached: assume strikes
+        while hypotheticalFrames.count < 10 {
+            let isTenth = hypotheticalFrames.count == 9
+            let strikeRolls: [Set<Int>] = isTenth
+                ? [Set(1...10), Set(1...10), Set(1...10)]
+                : [Set(1...10)]
+            hypotheticalFrames.append(Frame(rollPins: strikeRolls))
+        }
+
+        return Game(frames: hypotheticalFrames).totalScore
+    }
+
+    /// Given the rolls already thrown in a frame, fills in the rest with the best case
+    /// (knocking down whatever pins remain standing) until the frame is complete.
+    private func bestCaseCompletion(of partialRolls: [Set<Int>], isTenth: Bool) -> Frame {
+        var rollPins = partialRolls
+
+        func isComplete() -> Bool {
+            let rolls = rollPins.map { $0.count }
+            if isTenth {
+                if rolls.count == 2 && rolls[0] + rolls[1] < 10 { return true }
+                if rolls.count == 3 { return true }
+                return false
+            } else {
+                if rolls.count == 2 { return true }
+                if rolls.first == 10 { return true }
+                return false
+            }
+        }
+
+        while !isComplete() {
+            let standing = Frame(rollPins: rollPins).pinsStandingForNextRoll
+            rollPins.append(standing)
+        }
+
+        return Frame(rollPins: rollPins)
     }
 
     private func finishFrame() {

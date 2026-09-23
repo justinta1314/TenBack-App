@@ -11,6 +11,7 @@ struct ProfileView: View {
     @Environment(ArsenalStore.self) private var arsenalStore
     @State private var showingAddBall = false
     @State private var editingBall: BowlingBall? = nil
+    @AppStorage("appearanceMode") private var appearanceModeRaw: String = AppearanceMode.system.rawValue
 
     var body: some View {
         List {
@@ -18,6 +19,15 @@ struct ProfileView: View {
                 // Placeholder for future account info (name, sign-in status, etc.)
                 Text("Profile")
                     .font(.title2.bold())
+            }
+
+            Section("Appearance") {
+                Picker("Appearance", selection: $appearanceModeRaw) {
+                    ForEach(AppearanceMode.allCases) { mode in
+                        Text(mode.label).tag(mode.rawValue)
+                    }
+                }
+                .pickerStyle(.segmented)
             }
 
             Section("My Arsenal") {
